@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PLASTIC PATROL</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1><i class="fas fa-recycle"></i> PLASTIC PATROL</h1>
+        <p>Upload a plastic item and get personalized recycling guidance</p>
+      </div>
+
+      <div class="upload-card">
+        <div class="upload-area" id="uploadArea">
+          <i class="fas fa-cloud-upload-alt"></i>
+          <h3>Choose an Image</h3>
+          <p>Drag & drop or click to upload a plastic item photo</p>
+          <input type="file" id="imageInput" accept="image/*" />
+        </div>
+
+        <div
+          class="preview-container"
+          id="previewContainer"
+          style="display: none"
+        >
+          <img id="previewImage" alt="Preview" />
+          <button class="analyze-btn" onclick="processImage()">
+            <i class="fas fa-search"></i> Analyze Item
+          </button>
+        </div>
+      </div>
+
+      <div class="results-container">
+        <div class="result-card" id="labelResult" style="display: none">
+          <div class="result-header">
+            <i class="fas fa-tag"></i>
+            <h3>Detected Item</h3>
+          </div>
+          <div class="result-content" id="detectionResult"></div>
+        </div>
+
+        <div class="result-card" id="graniteResponse" style="display: none">
+          <div class="result-header">
+            <i class="fas fa-lightbulb"></i>
+            <h3>AI Recycling Guide</h3>
+          </div>
+          <div class="result-content" id="aiSuggestion"></div>
+        </div>
+      </div>
+
+      <div class="loading" id="loading" style="display: none">
+        <div class="spinner"></div>
+        <p>Analyzing your item...</p>
+      </div>
+    </div>
+
+    <script>
+      // Drag and drop functionality
+      const uploadArea = document.getElementById("uploadArea");
+      const imageInput = document.getElementById("imageInput");
+      const previewContainer = document.getElementById("previewContainer");
+      const previewImage = document.getElementById("previewImage");
+
+      uploadArea.addEventListener("click", () => imageInput.click());
+
+      uploadArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        uploadArea.classList.add("dragover");
+      });
+
+      uploadArea.addEventListener("dragleave", () => {
+        uploadArea.classList.remove("dragover");
+      });
+
+      uploadArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove("dragover");
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          imageInput.files = files;
+          handleFileSelect();
+        }
+      });
+
+      imageInput.addEventListener("change", handleFileSelect);
+
+      function handleFileSelect() {
+        const file = imageInput.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            previewImage.src = e.target.result;
+            uploadArea.style.display = "none";
+            previewContainer.style.display = "block";
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+
+      async function processImage() {
+        const file = imageInput.files[0];
+        if (!file) return alert("Please upload an image first!");
+
+        // Show loading state
+        document.getElementById("loading").style.display = "flex";
+        document.getElementById("labelResult").style.display = "none";
+        document.getElementById("graniteResponse").style.display = "none";
+
+        const reader = new FileReader();
+
+        reader.onloadend = async () => {
+          try {
+            const base64DataUrl = reader.result;
+            const base64 = base64DataUrl.split(",")[1];
+
+            // Call Hugging Face model to classify
+            const classify = await fetch(
+              "https://api-inference.huggingface.co/models/microsoft/resnet-50",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: "Bearer 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",
+                },
+                body: JSON.stringify({ inputs: base64 }),
+              },
+            );
+
+            const resJson = await classify.json();
+            const label = Array.isArray(resJson)
+              ? resJson[0]?.label
+              : "plastic item";
+
+            // Show detection result
+            document.getElementById("detectionResult").innerHTML =
+              `<strong>${label}</strong>`;
+            document.getElementById("labelResult").style.display = "block";
+
+            // Call your backend Granite endpoint
+            const graniteResp = await fetch("/granite", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: `Provide specific recycling and reuse suggestions for this item: ${label}. Include disposal methods, environmental impact, and creative reuse ideas.`,
+              }),
+            });
+
+            const data = await graniteResp.json();
+            console.log("Granite response:", data);
+
+            const suggestion =
+              data.choices?.[0]?.message?.content ||
+              data.results?.[0]?.generated_text ||
+              data.error ||
+              "No response received";
+
+            // Format AI text nicely
+            const formattedSuggestion = suggestion
+              .replace(/\n\n/g, "<br><br>")
+              .replace(/\n/g, "<br>")
+              .replace(/(\d+\.\s)/g, "<br><strong>$1</strong>")
+              .replace(/:\s/g, ":</strong> ")
+              .replace(
+                /<strong>(\d+\.\s[^:]+):<\/strong>/g,
+                "<strong>$1:</strong>",
+              );
+
+            document.getElementById("aiSuggestion").innerHTML =
+              formattedSuggestion;
+            document.getElementById("graniteResponse").style.display = "block";
+          } catch (error) {
+            console.error("Error:", error);
+            document.getElementById("aiSuggestion").innerHTML =
+              "Sorry, there was an error processing your request. Please try again.";
+            document.getElementById("graniteResponse").style.display = "block";
+          } finally {
+            document.getElementById("loading").style.display = "none";
+          }
+        };
+
+        reader.readAsDataURL(file);
+      }
+    </script>
+  </body>
+</html>
