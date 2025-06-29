@@ -21,6 +21,17 @@ Plastic Patrol is designed to simplify the complex task of identifying plastic t
 5. User-Friendly Interface: Simple and intuitive browser-based application, requiring no technical knowledge from the user.
 
 6. Scalable and Lightweight: Designed for easy deployment in various settings, from individual use to community initiatives.
+## How to Run
+
+Plastic Patrol is a browser-based web application. Users interact with it through a simple upload interface.
+
+1. Access the Application: Navigate to the hosted URL of the Plastic Patrol web application in your browser. (Since this is a conceptual README, a specific URL would be provided upon deployment).
+
+2. Upload a Photo: On the application's interface, select the option to upload a photo of a plastic item from your device.
+
+3. Receive Guidance: The application will process your image using its AI pipeline and display personalized disposal or reuse suggestions.
+
+4. Follow Suggestions: Implement the advice provided to make informed decisions about your plastic waste.
 ## How it works
 
 The core of Plastic Patrol lies in its seamless integration of computer vision and natural language generation:
